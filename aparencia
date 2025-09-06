@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gerenciador de Agenda</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Poppins', sans-serif;
+        }
+        .event-card {
+            transition: all 0.3s ease;
+        }
+        .event-card:hover {
+            border-color: #e5e7eb;
+        }
+        .calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 1px;
+        }
+        .calendar-day {
+            padding: 10px;
+            text-align: center;
+            border: 1px solid #e5e7eb;
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <header class="bg-blue-600 text-white py-4 shadow-md">
+        <div class="container mx-auto px-4 flex items-center justify-between">
+            <h1 class="text-2xl font-bold">Gerenciador de Agenda</h1>
+            <div class="flex items-center space-x-4">
+                <img src="https://storage.googleapis.com/workspace-0f70711f-8b4e-4d94-86f1-2a93ccde5887/image/07b57d5d-261f-4006-a43a-35099aa61ed7.png" alt="Imagem simulando um ícone de calendário com um bloco de dias numerados em um fundo de agenda roxa e branca" class="w-10 h-10 rounded-full">
+                <button id="addEventBtn" class="bg-white text-blue-600 px-4 py-2 rounded-lg font-semibold hover:bg-gray-100">Adicionar Evento</button>
+            </div>
+        </div>
+    </header>
+
+    <main class="container mx-auto px-4 py-8">
+        <!-- Modal para Adicionar/Editar Evento -->
+        <div id="eventModal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center">
+            <div class="bg-white rounded-lg p-6 w-full max-w-md">
+                <h2 class="text-xl font-bold mb-4" id="modalTitle">Adicionar Evento</h2>
+                <form id="eventForm">
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium mb-2">Título</label>
+                        <input type="text" id="eventTitle" class="w-full px-3 py-2 border rounded-lg" required>
+                    </div>
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium mb-2">Data</label>
+                        <input type="date" id="eventDate" class="w-full px-3 py-2 border rounded-lg" required>
+                    </div>
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium mb-2">Hora (opcional)</label>
+                        <input type="time" id="eventTime" class="w-full px-3 py-2 border rounded-lg">
+                    </div>
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium mb-2">Descrição</label>
+                        <textarea id="eventDescription" class="w-full px-3 py-2 border rounded-lg" rows="3"></textarea>
+                    </div>
+                    <div class="flex justify-end space-x-2">
+                        <button type="button" id="cancelBtn" class="px-4 py-2 bg-gray-300 rounded-lg">Cancelar</button>
+                        <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg">Salvar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Seção de Calendário -->
+        <section class="mb-8">
+            <h2 class="text-xl font-semibold mb-4 text-gray-800">Calendário</h2>
+            <div class="bg-white rounded-lg shadow-md p-4">
+                <div class="flex justify-between items-center mb-4">
+                    <button id="prevMonthBtn" class="px-3 py-1 bg-blue-600 text-white rounded-lg">Anterior</button>
+                    <h3 id="currentMonth" class="text-lg font-bold">Julho 2023</h3>
+                    <button id="nextMonthBtn" class="px-3 py-1 bg-blue-600 text-white rounded-lg">Próximo</button>
+                </div>
+                <div class="calendar-grid">
+                    <div class="calendar-day font-bold">Dom</div>
+                    <div class="calendar-day font-bold">Seg</div>
+                    <div class="calendar-day font-bold">Ter</div>
+                    <div class="calendar-day font-bold">Qua</div>
+                    <div class="calendar-day font-bold">Qui</div>
+                    <div class="calendar-day font-bold">Sex</div>
+                    <div class="calendar-day font-bold">Sáb</div>
+                    <!-- Dias serão preenchidos dinamicamente -->
+                </div>
+            </div>
+        </section>
+
+        <!-- Lista de Eventos -->
+        <section>
+            <h2 class="text-xl font-semibold mb-4 text-gray-800">Meus Eventos</h2>
+            <div id="eventsList" class="space-y-4">
+                <!-- Eventos serão listados aqui -->
+            </div>
+        </section>
+    </main>
+
+    <script>
+        let events = JSON.parse(localStorage.getItem('events')) || [];
+        let currentDate = new Date();
+        let currentMonth = currentDate.getMonth();
+        let currentYear = currentDate.getFullYear();
+        let selectedEventId = null;
+
+        const modal = document.getElementById('eventModal');
+        const modalTitle = document.getElementById('modalTitle');
+        const eventForm = document.getElementById('eventForm');
+        const eventTitle = document.getElementById('eventTitle');
+        const eventDate = document.getElementById('eventDate');
+        const eventTime = document.getElementById('eventTime');
+        const eventDescription = document.getElementById('eventDescription');
+        const addEventBtn = document.getElementById('addEventBtn');
+        const cancelBtn = document.getElementById('cancelBtn');
+        const prevMonthBtn = document.getElementById('prevMonthBtn');
+        const nextMonthBtn = document.getElementById('nextMonthBtn');
+        const currentMonthDisplay = document.getElementById('currentMonth');
+        const eventsList = document.getElementById('eventsList');
+
+        // Funções do Modal
+        addEventBtn.addEventListener('click', () => {
+            clearForm();
+            modalTitle.textContent = 'Adicionar Evento';
+            selectedEventId = null;
+            modal.classList.remove('hidden');
+        });
+
+        cancelBtn.addEventListener('click', () => {
+            modal.classList.add('hidden');
+        });
+
+        eventForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            if (selectedEventId) {
+                updateEvent();
+            } else {
+                addEvent();
+            }
+            modal.classList.add('hidden');
+            renderEvents();
+            saveEvents();
+        });
+
+        // Funções de Evento
+        function addEvent() {
+            const event = {
+                id: Date.now(),
+                title: eventTitle.value,
+                date: eventDate.value,
+                time: eventTime.value,
+                description: eventDescription.value
+            };
+            events.push(event);
+        }
+
+        function updateEvent() {
+            const event = events.find(e => e.id == selectedEventId);
+            if (event) {
+                event.title = eventTitle.value;
+                event.date = eventDate.value;
+                event.time = eventTime.value;
+                event.description = eventDescription.value;
+            }
+        }
+
+        function deleteEvent(id) {
+            events = events.filter(e => e.id != id);
+            saveEvents();
+            renderEvents();
+        }
+
+        function editEvent(id) {
+            const event = events.find(e => e.id == id);
+            if (event) {
+                selectedEventId = id;
+                eventTitle.value = event.title;
+                eventDate.value = event.date;
+                eventTime.value = event.time;
+                eventDescription.value = event.description;
+                modalTitle.textContent = 'Editar Evento';
+                modal.classList.remove('hidden');
+            }
+        }
+
+        function clearForm() {
+            eventTitle.value = '';
+            eventDate.value = '';
+            eventTime.value = '';
+            eventDescription.value = '';
+        }
+
+        // Funções de Calendário
+        function renderCalendar() {
+            const calendarGrid = document.querySelector('.calendar-grid');
+            const days = calendarGrid.querySelectorAll('.calendar-day').length;
+
+            for (let i = days - 7; i >= 0; i--) {
+                calendarGrid.children[i + 7].remove();
+            }
+
+            const firstDay = new Date(currentYear, currentMonth, 1);
+            const lastDay = new Date(currentYear, currentMonth + 1, 0);
+            const daysInMonth = lastDay.getDate();
+            const startingDayIndex = firstDay.getDay();
+
+            for (let i = 0; i < startingDayIndex; i++) {
+                const emptyDay = document.createElement('div');
+                emptyDay.className = 'calendar-day';
+                calendarGrid.appendChild(emptyDay);
+            }
+
+            for (let i = 1; i <= daysInMonth; i++) {
+                const dayElement = document.createElement('div');
+                dayElement.className = 'calendar-day cursor-pointer hover:bg-gray-100';
+                dayElement.textContent = i;
+                const currentDayEvents = events.filter(e => {
+                    const eventDate = new Date(e.date);
+                    return eventDate.getFullYear() === currentYear && eventDate.getMonth() === currentMonth && eventDate.getDate() === i;
+                });
+                if (currentDayEvents.length > 0) {
+                    dayElement.classList.add('bg-yellow-200');
+                    dayElement.innerHTML += `<div class="text-xs text-blue-600">${currentDayEvents.length} evento(s)</div>`;
+                }
+                calendarGrid.appendChild(dayElement);
+            }
+
+            const monthNames = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+            currentMonthDisplay.textContent = `${monthNames[currentMonth]} ${currentYear}`;
+        }
+
+        prevMonthBtn.addEventListener('click', () => {
+            currentMonth--;
+            if (currentMonth < 0) {
+                currentMonth = 11;
+                currentYear--;
+            }
+            renderCalendar();
+        });
+
+        nextMonthBtn.addEventListener('click', () => {
+            currentMonth++;
+            if (currentMonth > 11) {
+                currentMonth = 0;
+                currentYear++;
+            }
+            renderCalendar();
+        });
+
+        // Funções de Lista de Eventos
+        function renderEvents() {
+            eventsList.innerHTML = '';
+            events.sort((a, b) => new Date(a.date) - new Date(b.date));
+            events.forEach(event => {
+                const eventCard = document.createElement('div');
+                eventCard.className = 'event-card bg-white rounded-lg p-4 shadow-md border-l-4 border-blue-600';
+                eventCard.innerHTML = `
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <h3 class="font-semibold text-lg">${event.title}</h3>
+                            <p class="text-sm text-gray-600">${new Date(event.date).toLocaleDateString()} ${event.time ? 'às ' + event.time : ''}</p>
+                            <p class="text-gray-700 mt-2">${event.description}</p>
+                        </div>
+                        <div class="flex space-x-2">
+                            <button onclick="editEvent(${event.id})" class="px-3 py-1 bg-green-500 text-white rounded-lg text-sm">Editar</button>
+                            <button onclick="deleteEvent(${event.id})" class="px-3 py-1 bg-red-500 text-white rounded-lg text-sm">Excluir</button>
+                        </div>
+                    </div>
+                `;
+                eventsList.appendChild(eventCard);
+            });
+        }
+
+        // Salvamento e Carregamento
+        function saveEvents() {
+            localStorage.setItem('events', JSON.stringify(events));
+        }
+
+        // Inicialização
+        renderCalendar();
+        renderEvents();
+    </script>
+</body>
+</html>
+</content>
+</create_file>
